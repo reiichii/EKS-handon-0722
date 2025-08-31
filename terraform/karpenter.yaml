@@ -13,6 +13,11 @@ spec:
   securityGroupSelectorTerms:
     - tags:
         karpenter.sh/discovery: ex-terraform
+  metadataOptions:
+    httpEndpoint: enabled
+    httpProtocolIPv6: disabled
+    httpPutResponseHopLimit: 2
+    httpTokens: required
   tags:
     karpenter.sh/discovery: ex-terraform
 ---
