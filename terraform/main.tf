@@ -64,7 +64,7 @@ data "aws_availability_zones" "available" {
 data "aws_caller_identity" "current" {}
 
 locals {
-  name   = "ex-${basename(path.cwd)}"
+  name   = "ex-eks-handson"
   region = "ap-northeast-1"
 
   vpc_cidr = "10.0.0.0/16"

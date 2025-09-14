@@ -6,20 +6,20 @@ metadata:
 spec:
   amiSelectorTerms:
     - alias: bottlerocket@latest
-  role: ex-terraform
+  role: ex-eks-handson
   subnetSelectorTerms:
     - tags:
-        karpenter.sh/discovery: ex-terraform
+        karpenter.sh/discovery: ex-eks-handson
   securityGroupSelectorTerms:
     - tags:
-        karpenter.sh/discovery: ex-terraform
+        karpenter.sh/discovery: ex-eks-handson
   metadataOptions:
     httpEndpoint: enabled
     httpProtocolIPv6: disabled
     httpPutResponseHopLimit: 2
     httpTokens: required
   tags:
-    karpenter.sh/discovery: ex-terraform
+    karpenter.sh/discovery: ex-eks-handson
 ---
 apiVersion: karpenter.sh/v1
 kind: NodePool
@@ -45,6 +45,9 @@ spec:
         - key: "karpenter.k8s.aws/instance-generation"
           operator: Gt
           values: ["2"]
+        - key: "kubernetes.io/arch"
+          operator: In
+          values: ["amd64"]
   limits:
     cpu: 1000
   disruption:
