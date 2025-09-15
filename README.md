@@ -242,3 +242,43 @@ terraform destroy
 - 参考: https://github.com/aws-ia/terraform-aws-eks-blueprints/tree/main/patterns/karpenter-mng
 - local.nameでtf実行時のcurrent directoryを参照しているため、ex-terraformのようなクラスタ名になってしまう
 - `aws eks update-kubeconfig --name {クラスター名} --region ap-northeast-1`
+
+## 構築手順
+
+```
+# vpc
+terraform apply -target=module.vpc
+
+# eks
+terraform apply -target=module.eks
+
+# karpenter
+terraform apply
+
+# NodePoolとEC2NodeClassの作成
+kubectl apply --server-side -f karpenter.yaml
+
+# argocdデプロイ
+terraform apply
+
+# adonの適用
+kubectl apply --server-side -f bootstrap/addons.yaml
+
+# リクエスト情報の確認
+echo "ArgoCD Password: $(kubectl get secrets argocd-initial-admin-secret -n argocd --template="{{index .data.password | base64decode}}")"
+echo "ArgoCD URL: https://$(kubectl get svc -n argocd argo-cd-argocd-server -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
+
+# アプリケーションのデプロイ
+kubectl apply --server-side -f bootstrap/workloads.yaml
+```
+
+一時的なスケールイン
+```
+# ゲーム
+kubectl delete applicationset workloads -n argocd
+kubectl delete application workloads -n argocd
+
+# karpenter
+kubectl delete nodepool default
+kubectl delete ec2nodeclass default
+```

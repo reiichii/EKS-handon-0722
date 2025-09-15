@@ -40,6 +40,7 @@ module "eks" {
     karpenter = {
       ami_type       = "BOTTLEROCKET_x86_64"
       instance_types = ["m5.large"]
+      capacity_type  = "SPOT"
 
       min_size     = 1
       max_size     = 3
