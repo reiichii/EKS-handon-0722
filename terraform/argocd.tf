@@ -113,6 +113,11 @@ locals {
       workload_repo_basepath = local.gitops_workload_basepath
       workload_repo_path     = local.gitops_workload_path
       workload_repo_revision = local.gitops_workload_revision
+    },
+    {
+      karpenter_repo_url      = "https://github.com/reiichii/EKS-handon-0722"
+      karpenter_repo_path     = "terraform/karpenter"
+      karpenter_repo_revision = "main"
     }
   )
 }
