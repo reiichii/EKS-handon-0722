@@ -61,6 +61,19 @@ module "eks" {
         }
       }
     }
+    argocd = {
+      ami_type       = "BOTTLEROCKET_x86_64"
+      instance_types = ["t3.medium"]
+      capacity_type  = "SPOT"
+
+      min_size     = 1
+      max_size     = 2
+      desired_size = 1
+
+      labels = {
+        "workload-type" = "argocd"
+      }
+    }
   }
 
   node_security_group_tags = merge(local.tags, {

@@ -178,5 +178,28 @@ module "eks_blueprints_addons" {
   enable_velero                       = local.aws_addons.enable_velero
   enable_aws_gateway_api_controller   = local.aws_addons.enable_aws_gateway_api_controller
 
+  # ArgoCD specific configuration
+  argocd = {
+    values = [
+      yamlencode({
+        controller = {
+          nodeSelector = {
+            "workload-type" = "argocd"
+          }
+        }
+        server = {
+          nodeSelector = {
+            "workload-type" = "argocd"
+          }
+        }
+        repoServer = {
+          nodeSelector = {
+            "workload-type" = "argocd"
+          }
+        }
+      })
+    ]
+  }
+
   tags = local.tags
 }
