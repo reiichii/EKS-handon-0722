@@ -10,26 +10,16 @@ terraform {
       source  = "hashicorp/helm"
       version = ">= 2.9, < 3.0"
     }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = ">= 2.0"
+    }
   }
-
-  # ##  Used for end-to-end testing on project; update to suit your needs
-  # backend "s3" {
-  #   bucket = "terraform-ssp-github-actions-state"
-  #   region = "us-west-2"
-  #   key    = "e2e/karpenter-mng/terraform.tfstate"
-  # }
 }
 
 provider "aws" {
   region = local.region
 }
-
-# This provider is required for ECR to authenticate with public repos. Please note ECR authentication requires us-east-1 as region hence its hardcoded below.
-# If your region is same as us-east-1 then you can just use one aws provider
-# provider "aws" {
-#   alias  = "ecr"
-#   region = "us-east-1"
-# }
 
 provider "helm" {
   kubernetes {
@@ -39,9 +29,19 @@ provider "helm" {
     exec {
       api_version = "client.authentication.k8s.io/v1beta1"
       command     = "aws"
-      # This requires the awscli to be installed locally where Terraform is executed
-      args = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
+      args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
     }
+  }
+}
+
+provider "kubernetes" {
+  host                   = module.eks.cluster_endpoint
+  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command     = "aws"
+    args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
   }
 }
 
@@ -49,12 +49,7 @@ provider "helm" {
 # Common data/locals
 ################################################################################
 
-# data "aws_ecrpublic_authorization_token" "token" {
-#   provider = aws.ecr
-# }
-
 data "aws_availability_zones" "available" {
-  # Do not include local zones
   filter {
     name   = "opt-in-status"
     values = ["opt-in-not-required"]
@@ -64,94 +59,182 @@ data "aws_availability_zones" "available" {
 data "aws_caller_identity" "current" {}
 
 locals {
-  name   = "ex-eks-handson"
+  name   = "eks-handson"
   region = "ap-northeast-1"
 
   vpc_cidr = "10.0.0.0/16"
   azs      = slice(data.aws_availability_zones.available.names, 0, 3)
 
   tags = {
-    Blueprint  = local.name
-    GithubRepo = "github.com/aws-ia/terraform-aws-eks-blueprints"
-    user       = "reiko.sakaguchi"
+    user = var.user != "" ? var.user : "default-user"
   }
 }
 
-# ArgoCD
+################################################################################
+# VPC Module
+################################################################################
 
-variable "vpc_cidr" {
-  description = "VPC CIDR"
-  type        = string
-  default     = "10.0.0.0/16"
+module "vpc" {
+  source  = "terraform-aws-modules/vpc/aws"
+  version = "~> 5.0"
+
+  name = local.name
+  cidr = local.vpc_cidr
+
+  azs             = local.azs
+  private_subnets = [for k, v in local.azs : cidrsubnet(local.vpc_cidr, 4, k)]
+  public_subnets  = [for k, v in local.azs : cidrsubnet(local.vpc_cidr, 8, k + 48)]
+
+  enable_nat_gateway   = true
+  single_nat_gateway   = true
+  enable_dns_hostnames = true
+
+  public_subnet_tags = {
+    "kubernetes.io/role/elb" = 1
+  }
+
+  private_subnet_tags = {
+    "kubernetes.io/role/internal-elb" = 1
+  }
+
+  tags = local.tags
 }
-variable "region" {
-  description = "AWS region"
-  type        = string
-  default     = "us-west-2"
+
+################################################################################
+# EKS Module
+################################################################################
+
+module "eks" {
+  source  = "terraform-aws-modules/eks/aws"
+  version = "~> 20.24"
+
+  cluster_name    = local.name
+  cluster_version = "1.33"
+
+  enable_cluster_creator_admin_permissions = true
+  cluster_endpoint_public_access           = true
+
+  cluster_addons = {
+    coredns                = {}
+    eks-pod-identity-agent = {}
+    kube-proxy             = {}
+    vpc-cni                = {}
+  }
+
+  vpc_id     = module.vpc.vpc_id
+  subnet_ids = module.vpc.private_subnets
+
+  eks_managed_node_groups = {
+    ops = {
+      ami_type       = "BOTTLEROCKET_x86_64"
+      instance_types = ["m5.large", "t3.medium"]
+      capacity_type  = "SPOT"
+
+      min_size     = 2
+      max_size     = 4
+      desired_size = 3
+
+      labels = {
+        "workload-type" = "ops"
+      }
+    }
+  }
+
+  node_security_group_tags = merge(local.tags, {
+    "karpenter.sh/discovery" = local.name
+  })
+
+  tags = local.tags
 }
-variable "kubernetes_version" {
-  description = "Kubernetes version"
-  type        = string
-  default     = "1.28"
-}
-variable "addons" {
-  description = "Kubernetes addons"
-  type        = any
-  default = {
+
+################################################################################
+# ArgoCD Module
+################################################################################
+
+module "argocd" {
+  source = "./modules/argocd"
+
+  providers = {
+    kubernetes = kubernetes
+  }
+
+  cluster_name                       = module.eks.cluster_name
+  cluster_endpoint                   = module.eks.cluster_endpoint
+  cluster_version                    = module.eks.cluster_version
+  oidc_provider_arn                  = module.eks.oidc_provider_arn
+  cluster_certificate_authority_data = module.eks.cluster_certificate_authority_data
+  region                             = local.region
+  account_id                         = data.aws_caller_identity.current.account_id
+  vpc_id                             = module.vpc.vpc_id
+  kubernetes_version                 = "1.28"
+
+  addons = {
     enable_aws_load_balancer_controller = true
     enable_metrics_server               = true
+    enable_argocd                       = true
+    enable_karpenter                    = true
   }
-}
-# Addons Git
-variable "gitops_addons_org" {
-  description = "Git repository org/user contains for addons"
-  type        = string
-  default     = "https://github.com/aws-samples"
-}
-variable "gitops_addons_repo" {
-  description = "Git repository contains for addons"
-  type        = string
-  default     = "eks-blueprints-add-ons"
-}
-variable "gitops_addons_revision" {
-  description = "Git repository revision/branch/ref for addons"
-  type        = string
-  default     = "main"
-}
-variable "gitops_addons_basepath" {
-  description = "Git repository base path for addons"
-  type        = string
-  default     = "argocd/"
-}
-variable "gitops_addons_path" {
-  description = "Git repository path for addons"
-  type        = string
-  default     = "bootstrap/control-plane/addons"
+
+  tags = local.tags
+
+  depends_on = [module.eks]
 }
 
-# Workloads Git
-variable "gitops_workload_org" {
-  description = "Git repository org/user contains for workload"
-  type        = string
-  default     = "https://github.com/aws-ia"
+################################################################################
+# Karpenter Module (Commented out - Using ArgoCD addons instead)
+################################################################################
+
+# module "karpenter" {
+#   source = "./modules/karpenter"
+#
+#   cluster_name           = module.eks.cluster_name
+#   cluster_endpoint       = module.eks.cluster_endpoint
+#   oidc_provider_arn      = module.eks.oidc_provider_arn
+#   node_security_group_id = module.eks.node_security_group_id
+#
+#   tags = local.tags
+#
+#   depends_on = [module.argocd]
+# }
+
+################################################################################
+# Outputs
+################################################################################
+
+output "configure_kubectl" {
+  description = "Configure kubectl: make sure you're logged in with the correct AWS profile and run the following command to update your kubeconfig"
+  value       = "aws eks --region ${local.region} update-kubeconfig --name ${module.eks.cluster_name}"
 }
-variable "gitops_workload_repo" {
-  description = "Git repository contains for workload"
-  type        = string
-  default     = "terraform-aws-eks-blueprints"
+
+# 以下必要ないかも？
+
+output "vpc_id" {
+  description = "ID of the VPC where the cluster is deployed"
+  value       = module.vpc.vpc_id
 }
-variable "gitops_workload_revision" {
-  description = "Git repository revision/branch/ref for workload"
-  type        = string
-  default     = "main"
+
+output "cluster_name" {
+  description = "The name of the EKS cluster"
+  value       = module.eks.cluster_name
 }
-variable "gitops_workload_basepath" {
-  description = "Git repository base path for workload"
-  type        = string
-  default     = "patterns/gitops/"
+
+output "cluster_endpoint" {
+  description = "Endpoint for EKS control plane"
+  value       = module.eks.cluster_endpoint
 }
-variable "gitops_workload_path" {
-  description = "Git repository path for workload"
-  type        = string
-  default     = "getting-started-argocd/k8s"
+
+output "cluster_security_group_id" {
+  description = "Security group ids attached to the cluster control plane"
+  value       = module.eks.cluster_security_group_id
 }
+
+# Karpenter module outputs (Commented out - Using ArgoCD addons instead)
+# output "karpenter_node_iam_role_name" {
+#   description = "The name of the IAM role for the Karpenter node"
+#   value       = module.karpenter.node_iam_role_name
+# }
+
+# output "karpenter_queue_name" {
+#   description = "The name of the SQS queue"
+#   value       = module.karpenter.queue_name
+# }
