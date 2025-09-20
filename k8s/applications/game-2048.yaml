@@ -11,8 +11,6 @@ metadata:
   namespace: game-2048
   name: game-2048
 spec:
-  nodeSelector:
-    karpenter.sh/nodepool: "default"
   selector:
     matchLabels:
       app.kubernetes.io/name: game-2048
@@ -21,6 +19,8 @@ spec:
       labels:
         app.kubernetes.io/name: game-2048
     spec:
+      nodeSelector:
+        karpenter.sh/nodepool: "default"
       containers:
         - image: public.ecr.aws/l6m2t8p7/docker-2048
           name: game-2048
