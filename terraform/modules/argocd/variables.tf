@@ -105,7 +105,7 @@ variable "gitops_workload_revision" {
 variable "gitops_workload_basepath" {
   description = "Git repository base path for workload"
   type        = string
-  default     = "k8s/infrastructure"
+  default     = "k8s/infrastructure/"
 }
 
 variable "gitops_workload_path" {
