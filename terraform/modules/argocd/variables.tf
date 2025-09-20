@@ -105,13 +105,13 @@ variable "gitops_workload_revision" {
 variable "gitops_workload_basepath" {
   description = "Git repository base path for workload"
   type        = string
-  default     = "k8s/infrastructure/"
+  default     = "k8s/"
 }
 
 variable "gitops_workload_path" {
   description = "Git repository path for workload"
   type        = string
-  default     = "argocd/applications"
+  default     = "applications"
 }
 
 variable "tags" {
