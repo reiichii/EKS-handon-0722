@@ -114,6 +114,21 @@ variable "gitops_workload_path" {
   default     = "applications"
 }
 
+variable "gitops_karpenter_url" {
+  type    = string
+  default = "https://github.com/reiichii/EKS-handon-0722"
+}
+
+variable "gitops_karpenter_path" {
+  type    = string
+  default = "k8s/argocd/applications"
+}
+
+variable "gitops_karpenter_revision" {
+  type    = string
+  default = "main"
+}
+
 variable "tags" {
   description = "Tags to apply to resources"
   type        = map(string)

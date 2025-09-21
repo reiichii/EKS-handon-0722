@@ -130,9 +130,9 @@ module "eks" {
       instance_types = ["m5.large", "t3.medium"]
       capacity_type  = "SPOT"
 
-      min_size     = 2
-      max_size     = 4
-      desired_size = 3
+      min_size     = 1
+      max_size     = 3
+      desired_size = 2
 
       labels = {
         "workload-type" = "ops"
@@ -172,7 +172,6 @@ module "argocd" {
     enable_aws_load_balancer_controller = true
     enable_metrics_server               = true
     enable_argocd                       = true
-    enable_karpenter                    = true
   }
 
   tags = local.tags
@@ -184,18 +183,18 @@ module "argocd" {
 # Karpenter Module (Commented out - Using ArgoCD addons instead)
 ################################################################################
 
-# module "karpenter" {
-#   source = "./modules/karpenter"
-#
-#   cluster_name           = module.eks.cluster_name
-#   cluster_endpoint       = module.eks.cluster_endpoint
-#   oidc_provider_arn      = module.eks.oidc_provider_arn
-#   node_security_group_id = module.eks.node_security_group_id
-#
-#   tags = local.tags
-#
-#   depends_on = [module.argocd]
-# }
+module "karpenter" {
+  source = "./modules/karpenter"
+
+  cluster_name           = module.eks.cluster_name
+  cluster_endpoint       = module.eks.cluster_endpoint
+  oidc_provider_arn      = module.eks.oidc_provider_arn
+  node_security_group_id = module.eks.node_security_group_id
+
+  tags = local.tags
+
+  depends_on = [module.argocd]
+}
 
 ################################################################################
 # Outputs

@@ -11,6 +11,10 @@ locals {
   gitops_workload_path     = var.gitops_workload_path
   gitops_workload_revision = var.gitops_workload_revision
 
+  gitops_karpenter_url      = var.gitops_karpenter_url
+  gitops_karpenter_path     = var.gitops_karpenter_path
+  gitops_karpenter_revision = var.gitops_karpenter_revision
+
   aws_addons = {
     enable_cert_manager                          = try(var.addons.enable_cert_manager, false)
     enable_aws_efs_csi_driver                    = try(var.addons.enable_aws_efs_csi_driver, false)
@@ -85,9 +89,9 @@ locals {
       workload_repo_revision = local.gitops_workload_revision
     },
     {
-      karpenter_repo_url      = "https://github.com/reiichii/EKS-handon-0722"
-      karpenter_repo_path     = "k8s/infrastructure/karpenter"
-      karpenter_repo_revision = "main"
+      karpenter_repo_url      = local.gitops_karpenter_url
+      karpenter_repo_path     = local.gitops_karpenter_path
+      karpenter_repo_revision = local.gitops_karpenter_revision
     }
   )
 }
