@@ -14,9 +14,9 @@ spec:
     spec:
       project: default
       source:
-        repoURL: '{{metadata.annotations.gitops_karpenter_url}}'
-        path: '{{metadata.annotations.gitops_karpenter_path}}'
-        targetRevision: '{{metadata.annotations.gitops_karpenter_revision}}'
+        repoURL: '{{metadata.annotations.karpenter_repo_url}}'
+        path: '{{metadata.annotations.karpenter_repo_path}}'
+        targetRevision: '{{metadata.annotations.karpenter_repo_revision}}'
         directory:
           recurse: false
       destination:

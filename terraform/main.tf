@@ -95,6 +95,7 @@ module "vpc" {
 
   private_subnet_tags = {
     "kubernetes.io/role/internal-elb" = 1
+    "karpenter.sh/discovery"          = local.name
   }
 
   tags = local.tags
@@ -135,7 +136,8 @@ module "eks" {
       desired_size = 2
 
       labels = {
-        "workload-type" = "ops"
+        "workload-type"           = "ops"
+        "karpenter.sh/controller" = "true"
       }
     }
   }

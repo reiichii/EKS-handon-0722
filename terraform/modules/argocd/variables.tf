@@ -121,7 +121,7 @@ variable "gitops_karpenter_url" {
 
 variable "gitops_karpenter_path" {
   type    = string
-  default = "k8s/argocd/applications"
+  default = "k8s/karpenter"
 }
 
 variable "gitops_karpenter_revision" {
